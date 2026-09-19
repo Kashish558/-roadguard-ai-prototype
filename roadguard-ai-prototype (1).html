@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>RoadGuard AI — Prototype</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#ffffff; --panel-2:#eef0f3; --text:#14171c; --muted:#5b6270;
+    --border:#e1e4e9; --accent:#e2661c; --accent-2:#c2410c; --safe:#1a7f4b; --warn:#b7791f;
+    --crit:#b3261e; --line:#d7dae0; --shadow: 0 1px 2px rgba(20,23,28,.06), 0 8px 24px rgba(20,23,28,.06);
+    --chip-bg:#f2ede8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1115; --panel:#171a20; --panel-2:#1e222a; --text:#eef1f5; --muted:#9aa2b1;
+      --border:#2a2f38; --accent:#f2843a; --accent-2:#ff9a52; --safe:#3ecf8e; --warn:#f2b94a;
+      --crit:#ff6b63; --line:#2a2f38; --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+      --chip-bg:#25201b;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1115; --panel:#171a20; --panel-2:#1e222a; --text:#eef1f5; --muted:#9aa2b1;
+    --border:#2a2f38; --accent:#f2843a; --accent-2:#ff9a52; --safe:#3ecf8e; --warn:#f2b94a;
+    --crit:#ff6b63; --line:#2a2f38; --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --chip-bg:#25201b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+    min-height:100%;
+  }
+  .wrap{max-width:1100px; margin:0 auto; padding:20px 18px 60px;}
+  header.top{
+    position:sticky; top:0; z-index:20; background:var(--bg);
+    padding-top:calc(14px + env(safe-area-inset-top,0px)); padding-bottom:10px;
+    border-bottom:1px solid var(--border);
+  }
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+  .brand .logo{
+    width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:flex; align-items:center; justify-content:center; font-size:19px; flex:none;
+  }
+  .brand h1{font-size:18px; margin:0; letter-spacing:.2px;}
+  .brand .tag{font-size:11.5px; color:var(--muted); margin-top:1px;}
+  .brand .spacer{flex:1;}
+  .theme-btn{
+    border:1px solid var(--border); background:var(--panel); color:var(--text); border-radius:8px;
+    padding:6px 10px; font-size:12px; cursor:pointer;
+  }
+  nav.tabs{display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px;}
+  nav.tabs button{
+    flex:none; border:1px solid var(--border); background:var(--panel); color:var(--muted);
+    padding:9px 14px; border-radius:999px; font-size:13px; cursor:pointer; white-space:nowrap;
+    transition:all .15s ease;
+  }
+  nav.tabs button.active{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;}
+  section.view{display:none; padding-top:18px; animation:fade .25s ease;}
+  section.view.active{display:block;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+  .grid{display:grid; gap:14px;}
+  .g2{grid-template-columns:1.15fr .85fr;}
+  @media (max-width:820px){ .g2{grid-template-columns:1fr;} }
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
+    box-shadow:var(--shadow);
+  }
+  .card h2{font-size:15px; margin:0 0 4px;}
+  .card .sub{font-size:12.5px; color:var(--muted); margin:0 0 12px;}
+  .btnrow{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;}
+  button.btn{
+    border:none; background:var(--accent); color:#fff; padding:10px 16px; border-radius:10px;
+    font-size:13.5px; font-weight:600; cursor:pointer; transition:transform .1s ease, opacity .15s;
+  }
+  button.btn:hover{opacity:.92;}
+  button.btn:active{transform:scale(.97);}
+  button.btn.ghost{background:transparent; color:var(--text); border:1px solid var(--border); font-weight:500;}
+  button.btn.safe{background:var(--safe);}
+  button.btn.crit{background:var(--crit);}
+  button.btn:disabled{opacity:.45; cursor:not-allowed;}
+  input[type=file]{display:none;}
+  .canvas-wrap{position:relative; width:100%; border-radius:10px; overflow:hidden; border:1px solid var(--line); background:#000;}
+  canvas{display:block; width:100%; height:auto;}
+  #overlay{position:absolute; inset:0; width:100%; height:100%;}
+  .hint{font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.5;}
+  .pothole-list{display:flex; flex-direction:column; gap:8px; margin-top:12px;}
+  .ph-item{
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; cursor:pointer; background:var(--panel-2);
+    display:flex; justify-content:space-between; align-items:center; gap:10px; transition:border-color .15s;
+  }
+  .ph-item:hover{border-color:var(--accent);}
+  .ph-item.selected{border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);}
+  .ph-item .l{font-size:13px; font-weight:600;}
+  .ph-item .r{font-size:11px; color:var(--muted);}
+  .badge{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:.2px;}
+  .badge.low{background:#e6f4ea; color:#1a7f4b;}
+  .badge.medium{background:#fff4e0; color:#b7791f;}
+  .badge.high{background:#ffe6d9; color:#c2410c;}
+  .badge.critical{background:#fde3e1; color:#b3261e;}
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .badge.low{background:#123524; color:#5be3a4;}
+    :root:not([data-theme="light"]) .badge.medium{background:#3a2c10; color:#f2c568;}
+    :root:not([data-theme="light"]) .badge.high{background:#3a2115; color:#ff9a63;}
+    :root:not([data-theme="light"]) .badge.critical{background:#3a1512; color:#ff8b83;}
+  }
+  :root[data-theme="dark"] .badge.low{background:#123524; color:#5be3a4;}
+  :root[data-theme="dark"] .badge.medium{background:#3a2c10; color:#f2c568;}
+  :root[data-theme="dark"] .badge.high{background:#3a2115; color:#ff9a63;}
+  :root[data-theme="dark"] .badge.critical{background:#3a1512; color:#ff8b83;}
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:13px; margin-top:10px;}
+  .kv b{color:var(--muted); font-weight:600; font-size:12px;}
+  .empty{color:var(--muted); font-size:13px; padding:24px 10px; text-align:center;}
+  .phone{
+    max-width:270px; margin:14px auto 4px; border-radius:26px; border:6px solid #1c1c1e; background:#000;
+    padding:10px; box-shadow:var(--shadow);
+  }
+  .phone .screen{background:#e7ebf0; border-radius:16px; min-height:220px; padding:12px; display:flex; flex-direction:column; gap:8px;}
+  .phone .top-bar{font-size:10px; color:#5b6270; display:flex; justify-content:space-between; margin-bottom:2px;}
+  .bubble{background:#fff; border-radius:14px 14px 14px 4px; padding:10px 12px; font-size:12.2px; color:#14171c; line-height:1.5; box-shadow:0 1px 2px rgba(0,0,0,.08); max-width:92%;}
+  .bubble .from{font-size:10px; font-weight:700; color:var(--accent-2); margin-bottom:3px;}
+  .stars{color:#e0a52c; font-size:14px; letter-spacing:1px;}
+  table{width:100%; border-collapse:collapse; font-size:12.8px;}
+  th,td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line);}
+  th{color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px;}
+  tr:last-child td{border-bottom:none;}
+  .contractor-card{border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--panel-2); margin-bottom:10px;}
+  .contractor-card .head{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .contractor-card .name{font-weight:700; font-size:13.5px;}
+  .contractor-card .zone{font-size:11.5px; color:var(--muted);}
+  .status-pill{padding:3px 10px; border-radius:999px; font-size:10.5px; font-weight:700;}
+  .status-pill.eligible{background:#e6f4ea; color:#1a7f4b;}
+  .status-pill.risk{background:#fff4e0; color:#b7791f;}
+  .status-pill.blocked{background:#fde3e1; color:#b3261e;}
+  :root[data-theme="dark"] .status-pill.eligible{background:#123524; color:#5be3a4;}
+  :root[data-theme="dark"] .status-pill.risk{background:#3a2c10; color:#f2c568;}
+  :root[data-theme="dark"] .status-pill.blocked{background:#3a1512; color:#ff8b83;}
+  .stat{background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:12px 14px;}
+  .stat .n{font-size:22px; font-weight:800;}
+  .stat .l{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .stats-row{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+  @media (max-width:700px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+  .toast{
+    position:fixed; bottom:calc(18px + env(safe-area-inset-bottom,0px)); left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--text); color:var(--bg); padding:10px 18px; border-radius:999px; font-size:12.5px; font-weight:600;
+    opacity:0; transition:all .3s ease; pointer-events:none; z-index:60; box-shadow:var(--shadow); white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .foot{text-align:center; font-size:11px; color:var(--muted); margin-top:26px;}
+  .map-svg{width:100%; border-radius:12px; border:1px solid var(--line); background:var(--panel-2);}
+  .pin-label{font-size:9px; fill:var(--muted); font-family:inherit;}
+  .legend{display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:10px;}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .dot{width:9px; height:9px; border-radius:50%; display:inline-block;}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<header class="top">
+  <div class="wrap" style="padding:0;">
+    <div class="brand">
+      <div class="logo">🚧</div>
+      <div>
+        <h1>RoadGuard AI</h1>
+        <div class="tag">Team Codex Warrior · SIH26202 · Detection → Contractor Accountability</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="theme-btn" id="themeBtn">🌓 Theme</button>
+    </div>
+    <nav class="tabs">
+      <button data-view="detect" class="active">1 · Detect</button>
+      <button data-view="case">2 · Case &amp; SMS Alert</button>
+      <button data-view="contractor">3 · Contractor View</button>
+      <button data-view="gov">4 · Municipal Dashboard</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- VIEW 1: DETECT -->
+  <section class="view active" id="view-detect">
+    <div class="grid g2">
+      <div class="card">
+        <h2>Road Feed → AI + CV Detection</h2>
+        <p class="sub">Upload a real road photo, or load a generated sample frame. Detection runs live in your browser (grid-based contrast &amp; texture analysis) — production version replaces this with a trained YOLO11 model.</p>
+        <div class="canvas-wrap">
+          <canvas id="baseCanvas" width="640" height="400"></canvas>
+          <canvas id="overlay" width="640" height="400"></canvas>
+        </div>
+        <div class="btnrow">
+          <button class="btn ghost" id="sampleBtn">🎞️ Load Sample Frame</button>
+          <button class="btn ghost" id="uploadBtn">📷 Upload Road Photo</button>
+          <input type="file" id="fileInput" accept="image/*">
+          <button class="btn" id="runBtn" disabled>▶ Run AI + CV Detection</button>
+        </div>
+        <p class="hint" id="statusLine">Load a sample frame or upload a photo to begin.</p>
+      </div>
+      <div class="card">
+        <h2>Detections</h2>
+        <p class="sub">Tap a result to see severity, confidence &amp; geotag, then create a repair case.</p>
+        <div class="pothole-list" id="phList">
+          <div class="empty">No detections yet — run detection first.</div>
+        </div>
+        <div id="detailPanel"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 2: CASE -->
+  <section class="view" id="view-case">
+    <div class="grid g2">
+      <div class="card">
+        <h2>Repair Case</h2>
+        <p class="sub">Auto-matched to the contractor responsible for this road segment via zone/GIS lookup.</p>
+        <div id="caseBody"><div class="empty">No case selected yet. Go to <b>Detect</b>, pick a pothole, and click "Create Case".</div></div>
+      </div>
+      <div class="card">
+        <h2>Contractor Alert (SMS Simulation)</h2>
+        <p class="sub">Simulated delivery — production wires this to an SMS gateway (Twilio / MSG91) + WhatsApp fallback.</p>
+        <div class="phone">
+          <div class="screen" id="phoneScreen">
+            <div class="top-bar"><span>Messages</span><span>now</span></div>
+          </div>
+        </div>
+        <div class="btnrow" style="justify-content:center;">
+          <button class="btn" id="sendSmsBtn" disabled>📩 Send SMS to Contractor</button>
+        </div>
+        <div class="btnrow" style="justify-content:center;" id="simRow" style="display:none;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 3: CONTRACTOR -->
+  <section class="view" id="view-contractor">
+    <div class="card">
+      <h2>Contractor Accountability View</h2>
+      <p class="sub">Rating works like a delivery-app score — every SLA breach costs stars; every on-time repair earns them back. Below the eligibility threshold, a contractor is auto-flagged ineligible for new government tenders.</p>
+      <div id="contractorGrid"></div>
+    </div>
+  </section>
+
+  <!-- VIEW 4: GOV DASHBOARD -->
+  <section class="view" id="view-gov">
+    <div class="card" style="margin-bottom:14px;">
+      <h2>City Overview</h2>
+      <div class="stats-row" id="statsRow"></div>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h2>Road Risk Map (schematic)</h2>
+        <p class="sub">Pins color-coded by severity. In production this renders on real GIS/OpenStreetMap tiles.</p>
+        <svg viewBox="0 0 400 260" class="map-svg" id="mapSvg"></svg>
+        <div class="legend">
+          <span><i class="dot" style="background:#1a7f4b"></i>Low</span>
+          <span><i class="dot" style="background:#b7791f"></i>Medium</span>
+          <span><i class="dot" style="background:#c2410c"></i>High</span>
+          <span><i class="dot" style="background:#b3261e"></i>Critical</span>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Contractor Leaderboard</h2>
+        <p class="sub">Ranked by live rating — feeds directly into future tender scoring.</p>
+        <table id="leaderTable">
+          <thead><tr><th>#</th><th>Contractor</th><th>Rating</th><th>Tender Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">RoadGuard AI · Prototype build for demo purposes · Detection heuristic runs 100% client-side, no data leaves this browser.</p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- theme toggle ---------- */
+  const root = document.documentElement;
+  document.getElementById('themeBtn').addEventListener('click', ()=>{
+    const cur = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ---------- toast ---------- */
+  let toastTimer=null;
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+  }
+
+  /* ---------- tabs ---------- */
+  const tabBtns = document.querySelectorAll('nav.tabs button');
+  tabBtns.forEach(b=>{
+    b.addEventListener('click', ()=>{
+      tabBtns.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.querySelectorAll('section.view').forEach(v=>v.classList.remove('active'));
+      document.getElementById('view-'+b.dataset.view).classList.add('active');
+    });
+  });
+  function goTo(view){
+    tabBtns.forEach(x=>x.classList.toggle('active', x.dataset.view===view));
+    document.querySelectorAll('section.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+view).classList.add('active');
+  }
+
+  /* ---------- state ---------- */
+  const ZONES = [
+    {id:'Z1', label:'Zone A — Sector 70–82, Mohali'},
+    {id:'Z2', label:'Zone B — Chandigarh Tricity Link Rd'},
+    {id:'Z3', label:'Zone C — NH-44 Highway Stretch'},
+    {id:'Z4', label:'Zone D — Jalandhar City Roads'}
+  ];
+  let contractors = [
+    {id:'C1', name:'Shivalik Infra Pvt. Ltd.', zone:ZONES[0].id, rating:4.6, tenders:12, cases:[]},
+    {id:'C2', name:'Tricity RoadCon Co.', zone:ZONES[1].id, rating:3.9, tenders:7, cases:[]},
+    {id:'C3', name:'NHAI Highway Contractors', zone:ZONES[2].id, rating:4.2, tenders:9, cases:[]},
+    {id:'C4', name:'Doaba Builders & Works', zone:ZONES[3].id, rating:2.7, tenders:2, cases:[]}
+  ];
+  let detections = [];
+  let selectedIdx = null;
+  let cases = [];
+  let caseCounter = 1000;
+  let userLoc = null;
+
+  navigator.geolocation && navigator.geolocation.getCurrentPosition(
+    p=>{ userLoc = {lat:p.coords.latitude, lng:p.coords.longitude}; },
+    ()=>{ /* silent fallback to mock coords */ },
+    {timeout:2500}
+  );
+
+  /* ---------- canvas setup ---------- */
+  const baseCanvas = document.getElementById('baseCanvas');
+  const overlay = document.getElementById('overlay');
+  const bctx = baseCanvas.getContext('2d');
+  const octx = overlay.getContext('2d');
+  const W = 640, H = 400;
+  baseCanvas.width = W; baseCanvas.height = H;
+  overlay.width = W; overlay.height = H;
+
+  function clearOverlay(){ octx.clearRect(0,0,W,H); }
+
+  /* ---------- sample road generator ---------- */
+  function drawSampleRoad(){
+    // asphalt base with subtle gradient
+    const g = bctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#8d8d8d'); g.addColorStop(1,'#767676');
+    bctx.fillStyle = g; bctx.fillRect(0,0,W,H);
+    // speckle texture
+    for(let i=0;i<3500;i++){
+      const x=Math.random()*W, y=Math.random()*H;
+      const shade = 90+Math.random()*70;
+      bctx.fillStyle = `rgba(${shade},${shade},${shade},0.25)`;
+      bctx.fillRect(x,y,1.4,1.4);
+    }
+    // lane dashes
+    bctx.fillStyle = 'rgba(235,235,225,0.85)';
+    for(let y=-20;y<H;y+=46){ bctx.fillRect(W*0.5-4, y, 8, 26); }
+    // side edge lines
+    bctx.fillStyle='rgba(230,225,210,0.5)';
+    bctx.fillRect(30,0,5,H); bctx.fillRect(W-35,0,5,H);
+
+    function blob(cx,cy,r){
+      bctx.save();
+      bctx.translate(cx,cy);
+      bctx.beginPath();
+      const pts = 10;
+      for(let i=0;i<=pts;i++){
+        const a = (i/pts)*Math.PI*2;
+        const rad = r*(0.72+Math.random()*0.5);
+        const x = Math.cos(a)*rad, y = Math.sin(a)*rad*0.7;
+        if(i===0) bctx.moveTo(x,y); else bctx.lineTo(x,y);
+      }
+      bctx.closePath();
+      const rg = bctx.createRadialGradient(0,0,r*0.1,0,0,r);
+      rg.addColorStop(0,'#141210'); rg.addColorStop(0.65,'#2b241d'); rg.addColorStop(1,'#4a3f33');
+      bctx.fillStyle = rg; bctx.fill();
+      bctx.restore();
+    }
+    blob(180,150,42);
+    blob(430,230,58);
+    blob(500,110,26);
+    document.getElementById('statusLine').textContent = 'Sample frame loaded. Click "Run AI + CV Detection".';
+    document.getElementById('runBtn').disabled = false;
+    detections = []; renderList(); clearOverlay(); selectedIdx=null; renderDetail();
+  }
+
+  document.getElementById('sampleBtn').addEventListener('click', drawSampleRoad);
+
+  document.getElementById('uploadBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
+  document.getElementById('fileInput').addEventListener('change', (e)=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    const img = new Image();
+    img.onload = ()=>{
+      bctx.fillStyle = '#000'; bctx.fillRect(0,0,W,H);
+      const scale = Math.min(W/img.width, H/img.height);
+      const dw = img.width*scale, dh = img.height*scale;
+      bctx.drawImage(img, (W-dw)/2, (H-dh)/2, dw, dh);
+      document.getElementById('statusLine').textContent = 'Photo loaded. Click "Run AI + CV Detection".';
+      document.getElementById('runBtn').disabled = false;
+      detections = []; renderList(); clearOverlay(); selectedIdx=null; renderDetail();
+    };
+    img.src = URL.createObjectURL(f);
+  });
+
+  /* ---------- detection heuristic ---------- */
+  function runDetection(){
+    document.getElementById('statusLine').textContent = 'Running grid contrast analysis…';
+    setTimeout(()=>{
+      const data = bctx.getImageData(0,0,W,H).data;
+      const block = 10;
+      const gw = Math.ceil(W/block), gh = Math.ceil(H/block);
+      const lum = new Float32Array(gw*gh);
+      let sum=0;
+      for(let by=0; by<gh; by++){
+        for(let bx=0; bx<gw; bx++){
+          let s=0,c=0;
+          for(let y=by*block; y<Math.min(H,(by+1)*block); y++){
+            for(let x=bx*block; x<Math.min(W,(bx+1)*block); x++){
+              const i=(y*W+x)*4;
+              s += 0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+              c++;
+            }
+          }
+          const v = c? s/c : 0;
+          lum[by*gw+bx] = v;
+          sum += v;
+        }
+      }
+      const mean = sum/(gw*gh);
+      let variance=0;
+      for(let i=0;i<lum.length;i++) variance += (lum[i]-mean)*(lum[i]-mean);
+      const std = Math.sqrt(variance/lum.length);
+      const threshold = mean - std*0.55;
+
+      const candidate = new Uint8Array(gw*gh);
+      for(let i=0;i<lum.length;i++) candidate[i] = lum[i] < threshold ? 1 : 0;
+
+      const visited = new Uint8Array(gw*gh);
+      const comps = [];
+      for(let by=0; by<gh; by++){
+        for(let bx=0; bx<gw; bx++){
+          const idx = by*gw+bx;
+          if(candidate[idx] && !visited[idx]){
+            const stack=[[bx,by]]; visited[idx]=1;
+            let minX=bx,maxX=bx,minY=by,maxY=by,count=0,darkSum=0;
+            while(stack.length){
+              const [cx,cy]=stack.pop();
+              const ci=cy*gw+cx;
+              count++; darkSum += lum[ci];
+              minX=Math.min(minX,cx); maxX=Math.max(maxX,cx);
+              minY=Math.min(minY,cy); maxY=Math.max(maxY,cy);
+              const neighbors=[[cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]];
+              for(const [nx,ny] of neighbors){
+                if(nx>=0&&nx<gw&&ny>=0&&ny<gh){
+                  const ni=ny*gw+nx;
+                  if(candidate[ni] && !visited[ni]){ visited[ni]=1; stack.push([nx,ny]); }
+                }
+              }
+            }
+            comps.push({minX,maxX,minY,maxY,count,avgLum:darkSum/count});
+          }
+        }
+      }
+
+      const totalBlocks = gw*gh;
+      detections = comps
+        .filter(c => c.count >= 5 && c.count <= totalBlocks*0.4)
+        .map((c,i)=>{
+          const x = c.minX*block, y=c.minY*block;
+          const w = (c.maxX-c.minX+1)*block, h=(c.maxY-c.minY+1)*block;
+          const darkDelta = Math.max(0, mean - c.avgLum);
+          const areaCm2 = Math.round(c.count * 5 * 5 * (100/ (block*block)) * 10); // heuristic scaling
+          let severity, sevKey;
+          const score = c.count*1.0 + darkDelta*0.4;
+          if(score < 14){ severity='Low'; sevKey='low'; }
+          else if(score < 28){ severity='Medium'; sevKey='medium'; }
+          else if(score < 46){ severity='High'; sevKey='high'; }
+          else { severity='Critical'; sevKey='critical'; }
+          const confidence = Math.max(58, Math.min(97, Math.round(58 + darkDelta*1.6)));
+          const lat = (userLoc? userLoc.lat : 30.7046) + (Math.random()-0.5)*0.01;
+          const lng = (userLoc? userLoc.lng : 76.7179) + (Math.random()-0.5)*0.01;
+          const zone = ZONES[Math.min(3, Math.floor((x/W)*2) + Math.floor((y/H)*2))];
+          return {
+            id:'PH-'+(i+1), x,y,w,h, severity, sevKey, confidence, areaCm2,
+            lat:lat.toFixed(5), lng:lng.toFixed(5), zone: zone.id, zoneLabel: zone.label
+          };
+        })
+        .sort((a,b)=> ({Critical:0,High:1,Medium:2,Low:3}[a.severity]) - ({Critical:0,High:1,Medium:2,Low:3}[b.severity]));
+
+      drawBoxes();
+      renderList();
+      selectedIdx = null; renderDetail();
+      document.getElementById('statusLine').textContent = detections.length
+        ? `Detected ${detections.length} defect${detections.length>1?'s':''}. Tap one to inspect.`
+        : 'No defects detected in this frame — try another sample or photo with a clearer pothole.';
+      if(detections.length) toast('✅ AI + CV detection complete');
+    }, 450);
+  }
+  document.getElementById('runBtn').addEventListener('click', runDetection);
+
+  function sevColor(key){
+    return {low:'#1a7f4b', medium:'#b7791f', high:'#c2410c', critical:'#b3261e'}[key];
+  }
+
+  function drawBoxes(){
+    clearOverlay();
+    detections.forEach((d,i)=>{
+      octx.strokeStyle = sevColor(d.sevKey);
+      octx.lineWidth = i===selectedIdx? 4:2.5;
+      octx.strokeRect(d.x,d.y,d.w,d.h);
+      octx.fillStyle = sevColor(d.sevKey);
+      const label = d.id;
+      octx.font = '600 12px sans-serif';
+      const tw = octx.measureText(label).width+10;
+      octx.fillRect(d.x, Math.max(0,d.y-18), tw, 18);
+      octx.fillStyle = '#fff';
+      octx.fillText(label, d.x+5, Math.max(12,d.y-5));
+    });
+  }
+
+  function renderList(){
+    const list = document.getElementById('phList');
+    if(!detections.length){
+      list.innerHTML = '<div class="empty">No detections yet — run detection first.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    detections.forEach((d,i)=>{
+      const el = document.createElement('div');
+      el.className = 'ph-item' + (i===selectedIdx? ' selected':'');
+      el.innerHTML = `<div><div class="l">${d.id} <span class="badge ${d.sevKey}">${d.severity}</span></div>
+        <div class="r">${d.zoneLabel}</div></div>
+        <div class="r">${d.confidence}% conf.</div>`;
+      el.addEventListener('click', ()=>{ selectedIdx = i; drawBoxes(); renderList(); renderDetail(); });
+      list.appendChild(el);
+    });
+  }
+
+  function renderDetail(){
+    const panel = document.getElementById('detailPanel');
+    if(selectedIdx===null){ panel.innerHTML=''; return; }
+    const d = detections[selectedIdx];
+    const already = cases.find(c=>c.phId===d.id);
+    panel.innerHTML = `
+      <div class="kv">
+        <b>Severity</b><span class="badge ${d.sevKey}">${d.severity}</span>
+        <b>Confidence</b><span>${d.confidence}%</span>
+        <b>Est. area</b><span>~${d.areaCm2} cm²</span>
+        <b>GPS</b><span>${d.lat}, ${d.lng}</span>
+        <b>Road zone</b><span>${d.zoneLabel}</span>
+      </div>
+      <div class="btnrow">
+        <button class="btn" id="createCaseBtn" ${already?'disabled':''}>${already? '✓ Case already created' : '📋 Create Repair Case'}</button>
+      </div>`;
+    const btn = document.getElementById('createCaseBtn');
+    if(btn && !already){
+      btn.addEventListener('click', ()=> createCase(d));
+    }
+  }
+
+  /* ---------- case creation ---------- */
+  function createCase(d){
+    const contractor = contractors.find(c=>c.zone===d.zone) || contractors[0];
+    const slaHours = {Low:120, Medium:96, High:72, Critical:36}[d.severity];
+    const caseObj = {
+      id: 'RG-' + (caseCounter++),
+      phId: d.id,
+      severity: d.severity, sevKey: d.sevKey, confidence: d.confidence,
+      lat: d.lat, lng: d.lng, zoneLabel: d.zoneLabel,
+      contractorId: contractor.id,
+      slaHours, createdAt: Date.now(),
+      status: 'pending_notification',
+      smsSent: false
+    };
+    cases.push(caseObj);
+    contractor.cases.push(caseObj.id);
+    renderCaseView(caseObj);
+    renderDetail();
+    toast('📋 Case '+caseObj.id+' created & routed to '+contractor.name);
+    goTo('case');
+  }
+
+  function renderCaseView(caseObj){
+    const c = contractors.find(x=>x.id===caseObj.contractorId);
+    const body = document.getElementById('caseBody');
+    const deadline = new Date(caseObj.createdAt + caseObj.slaHours*3600*1000);
+    body.innerHTML = `
+      <div class="kv">
+        <b>Case ID</b><span>${caseObj.id}</span>
+        <b>Severity</b><span class="badge ${caseObj.sevKey}">${caseObj.severity}</span>
+        <b>Confidence</b><span>${caseObj.confidence}%</span>
+        <b>GPS</b><span>${caseObj.lat}, ${caseObj.lng}</span>
+        <b>Zone</b><span>${caseObj.zoneLabel}</span>
+        <b>Assigned to</b><span>${c.name} <span class="stars">${starString(c.rating)}</span> (${c.rating.toFixed(1)})</span>
+        <b>Repair SLA</b><span>${caseObj.slaHours} hrs (by ${deadline.toLocaleString()})</span>
+        <b>Status</b><span id="caseStatusTxt">${statusLabel(caseObj.status)}</span>
+      </div>`;
+    document.getElementById('sendSmsBtn').disabled = caseObj.smsSent;
+    document.getElementById('sendSmsBtn').onclick = ()=> sendSms(caseObj);
+    const simRow = document.getElementById('simRow');
+    if(caseObj.smsSent){
+      simRow.style.display='flex';
+      simRow.innerHTML = `
+        <button class="btn safe" id="repairOnTimeBtn">✅ Simulate: Repaired On Time</button>
+        <button class="btn crit" id="breachBtn">⏱️ Simulate: SLA Breached</button>`;
+      document.getElementById('repairOnTimeBtn').onclick = ()=> resolveCase(caseObj, true);
+      document.getElementById('breachBtn').onclick = ()=> resolveCase(caseObj, false);
+    } else {
+      simRow.style.display='none';
+    }
+  }
+
+  function statusLabel(s){
+    return {pending_notification:'⏳ Awaiting SMS dispatch', notified:'📨 Contractor notified — SLA clock running',
+      repaired:'✅ Repaired & verified', breached:'🚨 SLA breached — escalated'}[s] || s;
+  }
+
+  function starString(r){
+    const full = Math.round(r);
+    return '★★★★★'.slice(0,full) + '☆☆☆☆☆'.slice(0,5-full);
+  }
+
+  function sendSms(caseObj){
+    caseObj.smsSent = true;
+    caseObj.status = 'notified';
+    const c = contractors.find(x=>x.id===caseObj.contractorId);
+    const screen = document.getElementById('phoneScreen');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = `<div class="from">RoadGuard AI</div>
+      🚧 New case <b>${caseObj.id}</b><br>
+      Severity: <b>${caseObj.severity}</b><br>
+      Location: ${caseObj.lat}, ${caseObj.lng}<br>
+      Repair within <b>${caseObj.slaHours} hrs</b> or your contractor rating will drop and future tender eligibility may be affected.`;
+    screen.appendChild(bubble);
+    screen.scrollTop = screen.scrollHeight;
+    document.getElementById('sendSmsBtn').disabled = true;
+    toast('📩 SMS sent to '+c.name);
+    renderCaseView(caseObj);
+    refreshContractorView();
+  }
+
+  function resolveCase(caseObj, onTime){
+    const c = contractors.find(x=>x.id===caseObj.contractorId);
+    if(onTime){
+      caseObj.status = 'repaired';
+      c.rating = Math.min(5, +(c.rating + 0.15).toFixed(2));
+      toast('✅ Repair verified — '+c.name+' rating up to '+c.rating.toFixed(1));
+    } else {
+      caseObj.status = 'breached';
+      c.rating = Math.max(0, +(c.rating - 0.6).toFixed(2));
+      toast('🚨 SLA breach recorded — '+c.name+' rating down to '+c.rating.toFixed(1));
+    }
+    renderCaseView(caseObj);
+    refreshContractorView();
+    refreshGovView();
+  }
+
+  /* ---------- contractor view ---------- */
+  function tenderStatus(rating){
+    if(rating >= 4.0) return {label:'Tender Eligible', cls:'eligible'};
+    if(rating >= 3.0) return {label:'At Risk', cls:'risk'};
+    return {label:'Blacklisted', cls:'blocked'};
+  }
+
+  function refreshContractorView(){
+    const grid = document.getElementById('contractorGrid');
+    grid.innerHTML = '';
+    contractors.forEach(c=>{
+      const ts = tenderStatus(c.rating);
+      const myCases = cases.filter(cs=>cs.contractorId===c.id);
+      const rows = myCases.map(cs=>`<tr>
+          <td>${cs.id}</td><td><span class="badge ${cs.sevKey}">${cs.severity}</span></td>
+          <td>${statusLabel(cs.status)}</td><td>${cs.slaHours}h</td>
+        </tr>`).join('');
+      const div = document.createElement('div');
+      div.className = 'contractor-card';
+      div.innerHTML = `
+        <div class="head">
+          <div>
+            <div class="name">${c.name}</div>
+            <div class="zone">${ZONES.find(z=>z.id===c.zone).label}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="stars">${starString(c.rating)} <b style="color:var(--text);">${c.rating.toFixed(1)}</b></div>
+            <span class="status-pill ${ts.cls}">${ts.label}</span>
+          </div>
+        </div>
+        ${myCases.length ? `<table style="margin-top:10px;"><thead><tr><th>Case</th><th>Severity</th><th>Status</th><th>SLA</th></tr></thead><tbody>${rows}</tbody></table>`
+          : '<p class="hint">No cases assigned yet.</p>'}
+      `;
+      grid.appendChild(div);
+    });
+  }
+
+  /* ---------- gov dashboard ---------- */
+  function refreshGovView(){
+    const total = cases.length;
+    const critical = cases.filter(c=>c.severity==='Critical').length;
+    const repaired = cases.filter(c=>c.status==='repaired').length;
+    const compliance = total? Math.round((repaired/total)*100) : 0;
+    document.getElementById('statsRow').innerHTML = `
+      <div class="stat"><div class="n">${total}</div><div class="l">Total cases logged</div></div>
+      <div class="stat"><div class="n">${critical}</div><div class="l">Critical severity</div></div>
+      <div class="stat"><div class="n">${compliance}%</div><div class="l">SLA compliance</div></div>
+      <div class="stat"><div class="n">${contractors.filter(c=>c.rating<3).length}</div><div class="l">Contractors blacklisted</div></div>
+    `;
+    // leaderboard
+    const sorted = [...contractors].sort((a,b)=>b.rating-a.rating);
+    const tbody = document.querySelector('#leaderTable tbody');
+    tbody.innerHTML = sorted.map((c,i)=>{
+      const ts = tenderStatus(c.rating);
+      return `<tr><td>#${i+1}</td><td>${c.name}</td><td>${starString(c.rating)} ${c.rating.toFixed(1)}</td>
+        <td><span class="status-pill ${ts.cls}">${ts.label}</span></td></tr>`;
+    }).join('');
+    // map
+    const svg = document.getElementById('mapSvg');
+    let pins = '';
+    // simple road network background
+    pins += `<rect width="400" height="260" fill="none"/>
+      <path d="M0,60 H400 M0,140 H400 M0,210 H400" stroke="var(--line)" stroke-width="2"/>
+      <path d="M80,0 V260 M220,0 V260 M330,0 V260" stroke="var(--line)" stroke-width="2"/>`;
+    cases.forEach(c=>{
+      const x = 20 + (parseFloat(c.lng)-((userLoc?userLoc.lng:76.7179)-0.005))*4000 % 360;
+      const y = 20 + (parseFloat(c.lat)-((userLoc?userLoc.lat:30.7046)-0.005))*4000 % 220;
+      const cx = Math.max(15,Math.min(385, Math.abs(x)));
+      const cy = Math.max(15,Math.min(245, Math.abs(y)));
+      pins += `<circle cx="${cx}" cy="${cy}" r="7" fill="${sevColor(c.sevKey)}" stroke="#fff" stroke-width="1.5"/>
+        <text x="${cx+9}" y="${cy+3}" class="pin-label">${c.id}</text>`;
+    });
+    svg.innerHTML = pins;
+  }
+
+  /* ---------- init ---------- */
+  refreshContractorView();
+  refreshGovView();
+  drawSampleRoad();
+})();
+</script>
+</body>
+</html>
